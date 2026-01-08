@@ -169,7 +169,7 @@ local camera = workspace.CurrentCamera
 
 local main = Instance.new("ScreenGui")
 main.Name = "main"
-main.Parent = cloneref(game.CoreGui)
+main.Parent = guiParent -- <- replaced cloneref(game.CoreGui) with guiParent so the GUI shows in normal Roblox/Studio
 main.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
 local Frame = Instance.new("Frame")
