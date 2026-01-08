@@ -21,7 +21,7 @@ button.BackgroundColor3 = Color3.fromRGB(170, 40, 40)
 button.TextColor3 = Color3.new(1, 1, 1)
 button.Font = Enum.Font.GothamBold
 button.TextSize = 16
-button.Text = "FastAttack : OFF"
+button.Text = "關"
 button.BorderSizePixel = 0
 button.Active = true
 button.Draggable = true
@@ -36,10 +36,10 @@ uicorner.Parent = button
 button.MouseButton1Click:Connect(function()
     _G.FastAttackEnabled = not _G.FastAttackEnabled
     if _G.FastAttackEnabled then
-        button.Text = "FastAttack : ON"
+        button.Text = "開"
         button.BackgroundColor3 = Color3.fromRGB(40, 170, 70)
     else
-        button.Text = "FastAttack : OFF"
+        button.Text = "關"
         button.BackgroundColor3 = Color3.fromRGB(170, 40, 40)
     end
 end)
