@@ -1,0 +1,149 @@
+--==============================
+-- SIMPLE UI TOGGLE
+--==============================
+local Players = game:GetService("Players")
+local Player = Players.LocalPlayer
+
+-- Wait for PlayerGui
+local guiParent = Player:WaitForChild("PlayerGui")
+
+-- Create ScreenGui
+local gui = Instance.new("ScreenGui")
+gui.Name = "FastAttackToggleUI"
+gui.ResetOnSpawn = false
+gui.Parent = guiParent
+
+-- Create Button
+local button = Instance.new("TextButton")
+button.Size = UDim2.new(0, 160, 0, 45)
+button.Position = UDim2.new(0.05, 0, 0.4, 0)
+button.BackgroundColor3 = Color3.fromRGB(170, 40, 40)
+button.TextColor3 = Color3.new(1, 1, 1)
+button.Font = Enum.Font.GothamBold
+button.TextSize = 16
+button.Text = "FastAttack : OFF"
+button.BorderSizePixel = 0
+button.Active = true
+button.Draggable = true
+button.Parent = gui
+
+-- Rounded corners
+local uicorner = Instance.new("UICorner")
+uicorner.CornerRadius = UDim.new(0, 10)
+uicorner.Parent = button
+
+-- Button click toggles _G.FastAttackEnabled
+button.MouseButton1Click:Connect(function()
+    _G.FastAttackEnabled = not _G.FastAttackEnabled
+    if _G.FastAttackEnabled then
+        button.Text = "FastAttack : ON"
+        button.BackgroundColor3 = Color3.fromRGB(40, 170, 70)
+    else
+        button.Text = "FastAttack : OFF"
+        button.BackgroundColor3 = Color3.fromRGB(170, 40, 40)
+    end
+end)
+_G.FastAttackEnabled = true
+
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Player = Players.LocalPlayer
+local Character = Player.Character or Player.CharacterAdded:Wait()
+
+local Enemies = workspace:WaitForChild("Enemies")
+local Characters = workspace:WaitForChild("Characters")
+
+local Net = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
+local RegisterAttack = Net:WaitForChild("RE/RegisterAttack")
+local RegisterHit = Net:WaitForChild("RE/RegisterHit")
+
+
+local DETECT_RANGE = 10000              
+local HITBOX_SIZE = Vector3.new(450,450,450) 
+local ATTACK_INTERVAL = 0             
+
+
+local function Alive(char)
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    return hum and hum.Health > 0
+end
+
+local function GetPart(enemy)
+    return enemy:FindFirstChild("HumanoidRootPart") or enemy:FindFirstChild("Head")
+end
+
+
+local HRP
+local ORIGINAL_SIZE
+
+local function ExpandHRP()
+    HRP = Character:FindFirstChild("HumanoidRootPart")
+    if not HRP then return end
+
+    ORIGINAL_SIZE = ORIGINAL_SIZE or HRP.Size
+    HRP.Size = HITBOX_SIZE
+    HRP.Transparency = 1
+    HRP.LocalTransparencyModifier = 1
+    HRP.CanCollide = false
+end
+
+local function RestoreHRP()
+    if HRP and ORIGINAL_SIZE then
+        HRP.Size = ORIGINAL_SIZE
+    end
+end
+
+
+local function CollectTargets()
+    local targets = {}
+    local basePart
+    local myRoot = Character:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return nil, targets end
+
+    local function Scan(folder)
+        for _, enemy in ipairs(folder:GetChildren()) do
+            if enemy ~= Character and Alive(enemy) then
+                local part = GetPart(enemy)
+                if part and (part.Position - myRoot.Position).Magnitude <= DETECT_RANGE then
+                    targets[#targets+1] = {enemy, part}
+                    basePart = basePart or part
+                end
+            end
+        end
+    end
+
+    Scan(Enemies)
+    Scan(Characters)
+
+    return basePart, targets
+end
+
+
+local lastAttack = 0
+
+RunService.Heartbeat:Connect(function()
+    if not _G.FastAttackEnabled then return end
+    if os.clock() - lastAttack < ATTACK_INTERVAL then return end
+    lastAttack = os.clock()
+
+    local basePart, targets = CollectTargets()
+    if basePart and #targets > 0 then
+        
+        ExpandHRP()
+
+        RegisterAttack:FireServer(0)
+        RegisterHit:FireServer(basePart, targets)
+
+        
+        RestoreHRP()
+    end
+end)
+
+
+Player.CharacterAdded:Connect(function(char)
+    Character = char
+    ORIGINAL_SIZE = nil
+end)
