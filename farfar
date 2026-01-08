@@ -1,6 +1,6 @@
---==============================
--- SIMPLE UI TOGGLE
---==============================
+-- Combined script with minimal "link" so Fly GUI and Fast Attack work together
+-- Minimal changes: adds a shared flag _G.IsFlying and skips HRP size changes while flying.
+
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
 
@@ -33,6 +33,7 @@ uicorner.CornerRadius = UDim.new(0, 10)
 uicorner.Parent = button
 
 -- Button click toggles _G.FastAttackEnabled
+_G.FastAttackEnabled = true
 button.MouseButton1Click:Connect(function()
     _G.FastAttackEnabled = not _G.FastAttackEnabled
     if _G.FastAttackEnabled then
@@ -43,14 +44,11 @@ button.MouseButton1Click:Connect(function()
         button.BackgroundColor3 = Color3.fromRGB(170, 40, 40)
     end
 end)
-_G.FastAttackEnabled = true
 
 
-local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Player = Players.LocalPlayer
 local Character = Player.Character or Player.CharacterAdded:Wait()
 
 local Enemies = workspace:WaitForChild("Enemies")
@@ -80,6 +78,12 @@ local HRP
 local ORIGINAL_SIZE
 
 local function ExpandHRP()
+    -- If player is flying, skip changing HRP size to avoid conflicts with fly code.
+    if _G.IsFlying then
+        -- We intentionally do nothing to avoid interfering with flight anchoring/velocity.
+        return
+    end
+
     HRP = Character:FindFirstChild("HumanoidRootPart")
     if not HRP then return end
 
@@ -91,6 +95,11 @@ local function ExpandHRP()
 end
 
 local function RestoreHRP()
+    -- If we skipped expanding because flying, nothing to restore.
+    if _G.IsFlying then
+        return
+    end
+
     if HRP and ORIGINAL_SIZE then
         HRP.Size = ORIGINAL_SIZE
     end
@@ -132,13 +141,17 @@ RunService.Heartbeat:Connect(function()
     local basePart, targets = CollectTargets()
     if basePart and #targets > 0 then
         
-        ExpandHRP()
+        -- If not flying, expand HRP; if flying, skip expansion to avoid conflicts
+        if not _G.IsFlying then
+            ExpandHRP()
+        end
 
         RegisterAttack:FireServer(0)
         RegisterHit:FireServer(basePart, targets)
 
-        
-        RestoreHRP()
+        if not _G.IsFlying then
+            RestoreHRP()
+        end
     end
 end)
 
@@ -148,9 +161,10 @@ Player.CharacterAdded:Connect(function(char)
     ORIGINAL_SIZE = nil
 end)
 
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local LP = Players.LocalPlayer
+-- ========== Fly GUI part (unchanged except we set _G.IsFlying) ==========
+local Players2 = game:GetService("Players")
+local RunService2 = game:GetService("RunService")
+local LP = Players2.LocalPlayer
 local camera = workspace.CurrentCamera
 
 local main = Instance.new("ScreenGui")
@@ -284,8 +298,11 @@ local flying = false
 local flymode = "Velocity"
 
 local lastPosition
-onof.MouseButton1Down:connect(function()
+onof.MouseButton1Down:Connect(function()
     flying = not flying
+    -- set shared flag so fast-attack knows player is flying
+    _G.IsFlying = flying
+
     local humanoid = LP.Character:FindFirstChildOfClass("Humanoid")
     humanoid.PlatformStand = flying
     if not flying then return end
@@ -317,18 +334,20 @@ onof.MouseButton1Down:connect(function()
     lastPosition = nil
     rootPart.Anchored = false
     humanoid.PlatformStand = false
+    -- update shared flag when stopping flight
+    _G.IsFlying = false
 end)
 
 local tis
-up.MouseButton1Down:connect(function()
-    tis = up.MouseEnter:connect(function()
+up.MouseButton1Down:Connect(function()
+    tis = up.MouseEnter:Connect(function()
         while tis do task.wait()
             LP.Character.HumanoidRootPart.CFrame = LP.Character.HumanoidRootPart.CFrame * CFrame.new(0,1,0)
         end
     end)
 end)
 
-up.MouseLeave:connect(function()
+up.MouseLeave:Connect(function()
     if tis then
         tis:Disconnect()
         tis = nil
@@ -336,15 +355,15 @@ up.MouseLeave:connect(function()
 end)
 
 local dis
-down.MouseButton1Down:connect(function()
-    dis = down.MouseEnter:connect(function()
+down.MouseButton1Down:Connect(function()
+    dis = down.MouseEnter:Connect(function()
         while dis do task.wait()
             LP.Character.HumanoidRootPart.CFrame = LP.Character.HumanoidRootPart.CFrame * CFrame.new(0,-1,0)
         end
     end)
 end)
 
-down.MouseLeave:connect(function()
+down.MouseLeave:Connect(function()
     if dis then
         dis:Disconnect()
         dis = nil
@@ -357,12 +376,12 @@ speedbox:GetPropertyChangedSignal("Text"):Connect(function()
     end
 end)
 
-plus.MouseButton1Down:connect(function()
+plus.MouseButton1Down:Connect(function()
     flyspeed = flyspeed + 1
     speedbox.Text = flyspeed
 end)
 
-mine.MouseButton1Down:connect(function()
+mine.MouseButton1Down:Connect(function()
     flyspeed = flyspeed - 1
     speedbox.Text = flyspeed
 end)
